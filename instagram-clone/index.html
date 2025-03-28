@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaSnap - Hybrid Social Feed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👻</text></svg>">
+    <style>
+        .story-gradient {
+            background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+        }
+        .snap-viewer {
+            background: linear-gradient(45deg, #FFFC00, #FF0058, #FF7676, #7A00FF);
+        }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.5s;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="bg-gray-50 font-sans min-h-screen">
+        <div v-if="!isAuthenticated" class="fixed inset-0 z-50 bg-white flex items-center justify-center">
+            <div class="text-center p-8 max-w-md">
+                <h1 class="text-3xl font-bold mb-6 bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-500 bg-clip-text text-transparent">InstaSnap</h1>
+                <p class="mb-6 text-gray-600">Please sign in to continue</p>
+                <a href="signin.html" class="block w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 rounded-lg hover:opacity-90 transition mb-4">
+                    Sign In
+                </a>
+                <a href="signup.html" class="block w-full border border-pink-500 text-pink-500 py-2 rounded-lg hover:bg-pink-50 transition">
+                    Sign Up
+                </a>
+            </div>
+        </div>
+        <!-- Camera View (Snapchat-style) -->
+        <div v-if="cameraOpen" class="fixed inset-0 z-50 bg-black">
+            <div class="absolute top-4 left-4 text-white">
+                <button @click="cameraOpen = false" class="text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="h-full flex flex-col justify-between">
+                <div class="snap-viewer h-full flex items-center justify-center">
+                    <div class="text-center text-white">
+                        <i class="fas fa-camera text-5xl mb-4"></i>
+                        <p>Point your camera</p>
+                    </div>
+                </div>
+                <div class="bg-black bg-opacity-50 p-4 flex justify-center space-x-8">
+                    <button class="w-12 h-12 rounded-full border-2 border-white"></button>
+                    <button @click="takeSnap" class="w-16 h-16 rounded-full bg-red-500 border-4 border-white"></button>
+                    <button class="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center">
+                        <i class="fas fa-image"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div v-if="!cameraOpen" class="max-w-screen-md mx-auto md:max-w-screen-lg">
+            <!-- Header -->
+            <header class="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-500 bg-clip-text text-transparent">InstaSnap</h1>
+                <div class="flex space-x-4">
+                    <button @click="cameraOpen = true" class="text-gray-700 hover:text-gray-900">
+                        <i class="fas fa-camera text-2xl"></i>
+                    </button>
+                    <button class="text-gray-700 hover:text-gray-900">
+                        <i class="fas fa-comment-dots text-2xl"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Stories -->
+            <div class="bg-white border-b border-gray-200 px-4 py-4 overflow-x-auto">
+                <div class="flex space-x-4">
+                    <div v-for="(story, index) in stories" :key="index" class="flex flex-col items-center space-y-1">
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center story-gradient p-0.5">
+                            <div class="bg-white rounded-full w-full h-full flex items-center justify-center overflow-hidden">
+                                <img :src="story.avatar" class="w-full h-full object-cover" v-if="story.avatar">
+                                <i class="fas fa-user text-gray-400" v-else></i>
+                            </div>
+                        </div>
+                        <span class="text-xs">{{ story.user }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Posts -->
+            <div class="space-y-6 pb-16">
+                <transition-group name="fade">
+                    <div v-for="(post, index) in posts" :key="post.id" class="bg-white border border-gray-200 rounded-sm">
+                        <!-- Post Header -->
+                        <div class="flex items-center justify-between p-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                                    <img :src="post.avatar" class="w-full h-full object-cover" v-if="post.avatar">
+                                    <i class="fas fa-user text-gray-500" v-else></i>
+                                </div>
+                                <span class="font-semibold">{{ post.user }}</span>
+                            </div>
+                            <button class="text-gray-500">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Post Image -->
+                        <div class="w-full bg-gray-100" :style="{ height: '400px', background: post.background }"></div>
+                        
+                        <!-- Post Actions -->
+                        <div class="p-3 space-y-2">
+                            <div class="flex justify-between">
+                                <div class="flex space-x-4">
+                                    <button @click="toggleLike(index)" class="transition-transform duration-300" :class="{ 'text-red-500': post.liked, 'text-gray-700': !post.liked }">
+                                        <i class="far fa-heart text-2xl" :class="{ 'fas': post.liked }"></i>
+                                    </button>
+                                    <button class="text-gray-700 hover:text-gray-500">
+                                        <i class="far fa-comment text-2xl"></i>
+                                    </button>
+                                    <button class="text-gray-700 hover:text-gray-500">
+                                        <i class="far fa-paper-plane text-2xl"></i>
+                                    </button>
+                                </div>
+                                <button class="text-gray-700 hover:text-gray-500">
+                                    <i class="far fa-bookmark text-2xl"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Likes -->
+                            <div class="font-semibold">{{ post.likes }} likes</div>
+                            
+                            <!-- Caption -->
+                            <div>
+                                <span class="font-semibold">{{ post.user }}</span> {{ post.caption }}
+                            </div>
+                            
+                            <!-- Comments -->
+                            <div class="text-gray-500">View all {{ post.comments }} comments</div>
+                            <div class="text-xs text-gray-400">{{ post.time }}</div>
+                        </div>
+                    </div>
+                </transition-group>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 px-4">
+            <button class="text-gray-700">
+                <i class="fas fa-home text-xl"></i>
+            </button>
+            <button class="text-gray-700">
+                <i class="fas fa-search text-xl"></i>
+            </button>
+            <button @click="cameraOpen = true" class="text-gray-700">
+                <i class="fas fa-camera text-xl"></i>
+            </button>
+            <button class="text-gray-700">
+                <i class="fas fa-heart text-xl"></i>
+            </button>
+            <button class="text-gray-700">
+                <i class="fas fa-user text-xl"></i>
+            </button>
+        </nav>
+    </div>
+
+    <script>
+                const { createApp, ref, onMounted } = Vue;
+        
+        createApp({
+            setup() {
+                const isAuthenticated = ref(false);
+                
+                onMounted(() => {
+                    isAuthenticated.value = localStorage.getItem('isAuthenticated') === 'true';
+                    if (!isAuthenticated.value) {
+                        window.location.href = 'signin.html';
+                    }
+                });
+                const cameraOpen = ref(false);
+                const stories = ref([
+                    { user: 'Your Story', avatar: '' },
+                    { user: 'user1', avatar: '' },
+                    { user: 'user2', avatar: '' },
+                    { user: 'user3', avatar: '' },
+                    { user: 'user4', avatar: '' }
+                ]);
+                
+                const posts = ref([
+                    {
+                        id: 1,
+                        user: 'creative_user',
+                        avatar: '',
+                        background: 'linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)',
+                        caption: 'This is a creative twist combining Instagram and Snapchat! #InstaSnap #CreativeCoding',
+                        likes: 1234,
+                        liked: false,
+                        comments: 42,
+                        time: '2 HOURS AGO'
+                    },
+                    {
+                        id: 2,
+                        user: 'snap_fan',
+                        avatar: '',
+                        background: 'linear-gradient(45deg, #a1c4fd 0%, #c2e9fb 100%)',
+                        caption: 'Check out my new InstaSnap post! The future of social media is here 🚀',
+                        likes: 876,
+                        liked: true,
+                        comments: 23,
+                        time: '5 HOURS AGO'
+                    }
+                ]);
+                
+                const toggleLike = (index) => {
+                    const post = posts.value[index];
+                    post.liked = !post.liked;
+                    post.likes += post.liked ? 1 : -1;
+                };
+                
+                const takeSnap = () => {
+                    alert('Snap captured! This would open the editor in a full implementation.');
+                    cameraOpen.value = false;
+                };
+                
+                return {
+                    cameraOpen,
+                    stories,
+                    posts,
+                    toggleLike,
+                    takeSnap,
+                    isAuthenticated
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
